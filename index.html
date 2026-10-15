@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Let's Fix Agents and PVTs</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Layout: one centred column; home = flyer-style tile grid, then one card per step */
+:root{--agent:#d9466f;--pvt:#2f6fd0;--bg:#faf7f2;--card:#ffffff;--ink:#22212b;--muted:#6b6875;--line:#e6e0d8;--accent:#d9466f;--accent-ink:#fff;--ok:#2d7a4d;--ok-soft:#e2f2e7;--chg:#9a5b0a;--chg-soft:#fcefd8;--tbc:#8a8794;
+--t1:#ef6f5c;--t2:#a2b53a;--t3:#6b8acb;--t4:#e06aa4;--t5:#e9c254;--t6:#b46bd3;--t7:#7f73cf;--t8:#5fc4cc;--t9:#e7a6d6;
+--display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;--body:"Figtree","Segoe UI",system-ui,sans-serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17161c;--card:#211f28;--ink:#efedf2;--muted:#a7a3b0;--line:#34313d;--accent:#f27399;--accent-ink:#1b0c12;--ok:#72c995;--ok-soft:#1d3326;--chg:#f0b45e;--chg-soft:#392b16;--tbc:#8f8b99;--agent:#f27399;--pvt:#7aa8f5;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17161c;--card:#211f28;--ink:#efedf2;--muted:#a7a3b0;--line:#34313d;--accent:#f27399;--accent-ink:#1b0c12;--ok:#72c995;--ok-soft:#1d3326;--chg:#f0b45e;--chg-soft:#392b16;--tbc:#8f8b99;--agent:#f27399;--pvt:#7aa8f5;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--body)}
+.wrap{max-width:760px;margin:0 auto;padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2{font-family:var(--display);margin:0;text-wrap:balance;line-height:1.1}
+h1{font-size:clamp(1.8rem,6vw,2.6rem);font-weight:800}
+h2{font-size:clamp(1.3rem,4.5vw,1.7rem);font-weight:800}
+.muted{color:var(--muted)}.small{font-size:.86rem}
+.btn{font:600 .95rem var(--body);border:2px solid var(--line);background:var(--card);color:var(--ink);padding:10px 16px;border-radius:12px;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.big{font:800 1.1rem var(--display);padding:14px 28px;border-radius:999px}
+.btn.ok{border-color:var(--ok);color:var(--ok)}
+.btn.ok.on{background:var(--ok);color:var(--card)}
+.btn.small{padding:6px 11px;font-size:.84rem;border-radius:9px}
+.btn:disabled{opacity:.45;cursor:default}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+input,textarea{font:inherit;color:var(--ink);background:var(--card);border:2px solid var(--line);border-radius:10px;padding:9px 11px;width:100%}
+textarea{min-height:90px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.hero{text-align:center;display:grid;gap:10px;justify-items:center;margin-bottom:22px}
+.eyebrow{font-size:.78rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.bar{height:10px;border-radius:5px;background:var(--line);overflow:hidden;width:100%;max-width:420px}
+.bar i{display:block;height:100%;background:var(--accent);transition:width .4s}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:520px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.tile{border:0;border-radius:16px;padding:16px 12px;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;text-align:left;cursor:pointer;color:#1d1b22;font:800 1.05rem/1.15 var(--display)}
+.tile small{font:600 .78rem var(--body);opacity:.85}
+.tile .st{align-self:flex-start;background:rgb(255 255 255/.75);border-radius:999px;padding:2px 9px;font:700 .72rem var(--body)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px 20px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+.chip{font:700 .8rem var(--body);padding:5px 11px;border-radius:999px;background:var(--card);border:1px solid var(--line)}
+.steps{display:flex;gap:4px;margin:0 0 16px}
+.steps span{flex:1;height:7px;border-radius:4px;background:var(--line)}
+.steps span.on{background:var(--accent)}
+.pick{display:grid;gap:8px;margin-top:14px}
+.pick .btn{text-align:left;display:flex;justify-content:space-between;gap:10px;padding:14px 16px}
+.pick .btn.sel{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,var(--card))}
+.f{border-top:1px solid var(--line);padding:14px 0;display:grid;gap:8px}
+.f:first-of-type{border-top:0}
+.fl{font-weight:700;font-size:.92rem}
+.fv{white-space:pre-wrap;background:var(--bg);border-radius:10px;padding:9px 12px}
+.fv.tbc{color:var(--tbc);font-style:italic}
+.tag{font:700 .72rem var(--body);padding:2px 8px;border-radius:999px}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}.tag.chg{background:var(--chg-soft);color:var(--chg)}
+.foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;z-index:9}
+#confetti{position:fixed;inset:0;pointer-events:none}
+.choices{display:flex;flex-wrap:wrap;gap:8px}
+.choices .btn.sel,.pick .btn.sel{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--card))}
+.pick .btn{font-weight:500;line-height:1.45}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media (max-width:560px){.pgrid{grid-template-columns:1fr}}
+.prow{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid var(--line)}
+</style>
+</head><body>
+<div class="wrap" id="app"><div class="hero"><h1>Let's Fix Agents and PVTs</h1><p class="muted">Loading…</p></div></div>
+<div class="toast" id="toast" hidden></div>
+<script>
+// ===== SETUP: paste your Google Apps Script web app URL between the quotes =====
+const SCRIPT_URL="https://script.google.com/macros/s/AKfycbx6dKy3Hsdk_6w5v9rijK2h7eb8dLRG84amvVv7CYyXY9-anrp0cbU7CZJZIF_9fXhn2g/exec";
+// ==============================================================================
+const DATA={"progs": [{"name": "Silent Disco", "cands": ["p082", "p099", "p081"]}, {"name": "Hula Hoop", "cands": ["p048", "p050", "p085"]}, {"name": "Bubbles", "cands": ["p007", "p009", "p013", "p014", "p015", "p012", "p016"]}, {"name": "Line Dancing", "cands": ["p052", "p051"]}, {"name": "Disco", "cands": ["p017"]}, {"name": "Silent Circus", "cands": ["p069", "p018"]}, {"name": "Silent Mindful Art / Movement", "cands": ["p088", "p087", "p089"]}, {"name": "Playground Crazes", "cands": ["p062", "p092", "p035"]}, {"name": "Dance Through The Decades", "cands": ["p021"]}], "xero": {"p082": ["Silent Disco Incursion", "DK SD1", "Disco Kids", "Incursion", "Kids", "", "1.5hrs (Standard Incursion)", "Up to 40", "TBC", "TBC", "Silent Disco Incursion up to 40 Children 1.5hrs", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p099": ["UV Silent Disco Incursion", "DK SD11", "Disco Kids", "Incursion", "Kids", "", "", "Up to 40", "TBC", "TBC", "UV Silent Disco Incursion up to 40 Children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$495.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p081": ["Silent Disco Excursion Tour", "DK SD8", "Disco Kids", "Excursion/Tour", "Kids", "", "", "Up to 40", "TBC", "TBC", "Silent Disco Excursion Walking Tour for up to 40 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p048": ["Hula Hoop Workshop", "DK HW1", "Disco Kids", "Workshop", "Kids", "", "", "Up to 40", "TBC", "TBC", "Hula Hoop Workshop up to 40 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$350.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p050": ["L.E.D Hula Hoop Workshop", "DK HW2", "Disco Kids", "Workshop", "Kids", "", "", "Up to 30", "TBC", "TBC", "L.E.D Hula Hoop Workshop up to 30 Children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$375.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p085": ["Silent Hoop Workshop", "DK SD7", "Disco Kids", "Workshop", "Kids", "", "", "Up to 30", "TBC", "TBC", "Silent Hula Hoop Workshop for up to 30 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p007": ["Bubble & Slime Workshop", "DK BU2", "Disco Kids", "Workshop", "Kids", "", "", "Up to 40", "TBC", "TBC", "Bubble & Slime Workshop for up to 40 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p009": ["Bubble Disco Incursion", "DK BU5", "Disco Kids", "Incursion", "Kids", "", "", "Up to 50", "TBC", "TBC", "Bubble Disco For up to 50 Children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$350.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p013": ["Bubble Slime Workshop (1.5hrs)", "DK BS1", "Disco Kids", "Workshop", "Kids", "", "", "Up to 40", "TBC", "TBC", "Bubble Slime Workshop 1.5hrs for up to 40 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p014": ["Bubble Slime Workshop (2hrs)", "DK BS2", "Disco Kids", "Workshop", "Kids", "", "", "Up to 60", "TBC", "TBC", "Bubble Slime Workshop 2hrs for up to 60 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$495.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p015": ["Bubble Slime Workshop (3hrs)", "DK BS3", "Disco Kids", "Workshop", "Kids", "", "", "Up to 80", "TBC", "TBC", "Bubble Slime Workshop 3hrs for up to 80 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$695.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p012": ["Bubble Slime Science Incursion 2hrs up to 60 PAX", "DK BSS", "Disco Kids", "Incursion", "Kids", "", "", "Up to 60", "TBC", "TBC", "Bubble Slime Science Incursion 2hrs up to 60 PAX", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$495.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p016": ["Bubble Workshop", "DK BU1", "Disco Kids", "Workshop", "Kids", "", "", "Up to 40", "TBC", "TBC", "Bubble Workshop for up to 40 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p052": ["Line Dancing Incursion", "DK LD1", "Disco Kids", "Incursion", "Kids", "", "", "Up to 60", "TBC", "TBC", "Line Dancing Incursion - up to 60 children 1.5hrs", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p051": ["Line Dancing *Summer - Incursion up to 40 children", "DK LD", "Disco Kids", "Incursion", "Kids", "", "", "Up to 40", "TBC", "TBC", "Line Dancing *Summer - Incursion up to 40 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$318.18", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p017": ["Childrens Disco Incursion", "DK DS1", "Disco Kids", "Incursion", "Kids", "", "", "Up to 50", "TBC", "TBC", "Childrens Disco up to 50 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$320.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p069": ["Silent Circus", "DK SD3", "Disco Kids", "TBC", "Kids", "", "", "Up to 30", "TBC", "TBC", "Silent Circus Workshop up to 30 Children 1.5hrs", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p018": ["Circus Workshop", "DK CW1", "Disco Kids", "Workshop", "Kids", "", "", "Up to 40", "TBC", "TBC", "Circus Prop Workshop up to 40 children 1.5hrs", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$320.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p088": ["Silent Mindful ART + Joyful Movement", "DK SMA", "Both", "TBC", "Kids", "", "", "Up to 40", "TBC", "TBC", "Silent Mindful ART + Joyful Movement up to 40 Children 1.5hrs", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p087": ["Silent Mindful Art", "DP SMA PH", "Both", "TBC", "TBC", "", "", "Up to 20", "TBC", "TBC", "Silent Mindful Art Activation Session - Per Head (minimum 20 participants)", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$28.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p089": ["Silent Mindful Movement", "DK SD4", "Both", "TBC", "Kids", "", "", "Up to 40", "TBC", "TBC", "Silent Mindful Movement Workshop up to 40 Children 1.5hrs", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$275.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p062": ["Retro Sports / Old Skool Games", "DK OS", "Disco Kids", "TBC", "Kids", "", "", "Up to 40", "TBC", "TBC", "Retro Sports / Old Skool Games 1.5hrs up to 40 Children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p092": ["Skipping Workshop", "DK SK1", "Disco Kids", "Workshop", "Kids", "", "", "Up to 40", "TBC", "TBC", "Skipping Workshop for up to 40 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p035": ["Glow Skipping Workshop", "DK SK2", "Disco Kids", "Workshop", "Kids", "", "", "Up to 40", "TBC", "TBC", "Skipping Workshop with GLOW skipping ropes for up to 40 children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"], "p021": ["Dance Through The Decades", "DK DNC", "Disco Kids", "TBC", "Kids", "", "", "Up to 40", "TBC", "TBC", "Dance Through The Decades - Silent Dance Incursion for up to 40 Children", "TBC", "", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "$395.00", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "TBC", "COPY TO REVIEW", "TBC", "Active", "TBC", "TBC", "TBC"]}};
+const SUG={
+ "Silent Disco": {
+  "11": [
+   "Dive into a world of music and movement with our Silent Disco Party! Every child gets their own wireless headphones, and our professional host leads glow performances, dance games and interactive challenges. It's high-energy, inclusive fun where kids explore their rhythm, dance with friends and leave smiling.",
+   "Our most popular incursion! Kids pop on wireless silent disco headphones and dance their way through games, routines and a glowing opening performance, all led by a professional host. Silent Disco keeps energy high and noise low, so every child can join in, have fun and build confidence through movement."
+  ],
+  "12": [
+   "Dive into a world of music and movement with the Disco Kids Au Silent Disco Party, our most popular incursion. Every child receives their own pair of wireless silent disco headphones, so they're fully immersed in the music while the room stays calm. Our professional host opens with a glow performance, then leads the group through easy-to-follow dance routines, music games and interactive challenges. Kids explore rhythm, express themselves and connect with friends in a high-energy session where everyone can join in. All equipment and facilitation are included.",
+   "Silent Disco is the incursion kids ask for again and again. Each child wears wireless headphones, turning any room into an immersive dance party without the noise. A professional Disco Kids Au host runs the whole session, starting with a glowing opening performance before moving into dance games, routines and group challenges. Because every child hears the music clearly through their own headset, quieter kids feel comfortable joining in and confident dancers can shine. The session builds rhythm, coordination, confidence and teamwork while keeping the energy high from start to finish. We bring all the headphones and equipment, so you just provide the space and the kids."
+  ],
+  "13": [
+   "Kids put on wireless headphones, watch a glow opening performance, then dance through games, routines and challenges led by our host.",
+   "Dance to music through their own silent disco headset, follow simple routines, play music and movement games, and take part in group dance challenges."
+  ],
+  "14": [
+   "Silent disco headphones for every child · Opening glow performance · Professional host · Dance games and routines · Interactive activities",
+   "Wireless headsets for all · Glow performance to kick off · Easy-to-follow routines · Music games and group challenges · Fully hosted session"
+  ],
+  "15": [
+   "Builds confidence, rhythm and coordination, gets kids active, and encourages connection with friends in an inclusive, low-noise setting.",
+   "Kids stay active and engaged, quieter children feel comfortable joining in, and everyone builds teamwork, self-expression and coordination."
+  ],
+  "16": [
+   "Each child has their own headphones, so it's fully immersive yet quiet, and the glow performance makes it feel like a real party.",
+   "A real disco experience without the noise: individual headsets keep every child focused on the music and the host, so participation stays high."
+  ]
+ },
+ "Hula Hoop": {
+  "11": [
+   "Get ready to spin! Our Hula Hoop incursion teaches kids easy, fun hoop tricks step by step, from waist hooping to arm spins and simple combos. A professional host keeps the music pumping and the energy high, with games and challenges that help every child build confidence and coordination at their own pace.",
+   "Hula hooping is back and kids love it! In this hosted session, children learn hoop skills and tricks through music, games and friendly challenges. It's beginner friendly, great for all abilities, and a brilliant way to get kids moving, laughing and proud of what they can do by the end."
+  ],
+  "12": [
+   "Get ready to spin with the Disco Kids Au Hula Hoop incursion. Led by a professional host, kids learn hoop skills step by step, starting with the basics of waist hooping and building up to arm spins, tosses and simple tricks. Music keeps the energy high, and fun games and challenges give every child a chance to practise, improve and show off their new moves. The session is beginner friendly and designed so children of different ages and abilities can all succeed. It's active, joyful and great for building coordination, focus and confidence. We bring all the hoops and equipment, so you just provide the space.",
+   "Hula hooping is a timeless playground favourite, and our Hula Hoop incursion brings it to life with music, games and expert guidance. A Disco Kids Au host teaches kids how to keep the hoop spinning, then introduces fun tricks and challenges suited to their skill level. Children work at their own pace, celebrate small wins and cheer each other on, so everyone leaves feeling proud. It's a fantastic way to get kids moving while building coordination, persistence and focus."
+  ],
+  "13": [
+   "Learn to hula hoop step by step, try arm spins and simple tricks, and join in music games and hoop challenges.",
+   "Practise hoop skills with a host, play hoop games to music, and show off new tricks in friendly group challenges."
+  ],
+  "14": [
+   "Hoops for every child · Professional host · Step-by-step tricks · Music and hoop games · Beginner friendly",
+   "All hoops provided · Skill-building at each child's pace · Fun challenges · Music throughout · Suits all abilities"
+  ],
+  "15": [
+   "Builds coordination, balance and persistence, gets kids active, and boosts confidence as they master new tricks.",
+   "Kids develop gross motor skills and focus, learn to keep trying, and celebrate their progress with friends."
+  ],
+  "16": [
+   "Every child gets hands-on time with a hoop and learns real tricks, so they leave with a new skill they can keep practising.",
+   "A classic playground activity turned into a hosted, music-filled experience where every child can succeed at their own level."
+  ]
+ },
+ "Bubbles": {
+  "11": [
+   "Pop into a world of bubbles! Kids explore giant bubbles, bubble wands and bubble games in a fun, hands-on session led by a professional host. Music, movement and plenty of wonder make this a joyful experience for all ages, with every child getting the chance to create, chase and play.",
+   "Bubbles bring instant smiles. In this hosted incursion, children experiment with bubble making, play bubble games and move to music as bubbles fill the space. It's playful, sensory and inclusive, so kids of all ages and abilities can join in, explore and have fun together."
+  ],
+  "12": [
+   "Pop into a world of bubbles with the Disco Kids Au Bubbles incursion. A professional host leads kids through hands-on bubble play, from making their own bubbles to creating giant ones and joining in bubble games and challenges. Music and movement keep the energy flowing, and every child gets a turn to create, chase and explore. It's a joyful, sensory experience that sparks curiosity and wonder while getting kids active and playing together. We bring the bubble equipment, so you just provide the space.",
+   "Few things make kids smile like bubbles. Our Bubbles incursion combines hands-on bubble making with games, music and movement, all led by a friendly Disco Kids Au host. Children experiment with different bubble tools, try to make the biggest bubble, and take part in fun group challenges. Along the way they explore cause and effect, take turns and play cooperatively. It's playful, inclusive and full of wonder, and it suits a wide range of ages. All bubble equipment is provided, and the session is designed for maximum participation and fun."
+  ],
+  "13": [
+   "Make their own bubbles, try giant bubble wands, chase and pop bubbles, and play bubble games to music.",
+   "Experiment with bubble tools, compete in bubble challenges and dance and move as bubbles fill the space."
+  ],
+  "14": [
+   "Hands-on bubble making · Giant bubbles · Bubble games and challenges · Music and movement · Professional host",
+   "All bubble equipment provided · Sensory, hands-on play · Group challenges · Suits all ages and abilities"
+  ],
+  "15": [
+   "Sparks curiosity and wonder, encourages turn-taking and cooperation, and gets kids moving in a calm, joyful way.",
+   "Supports sensory exploration, fine and gross motor skills, and cooperative play while keeping every child engaged."
+  ],
+  "16": [
+   "It's hands-on: every child gets to make and play with bubbles, not just watch them.",
+   "Combines bubble play with music and movement, turning a simple favourite into an interactive group experience."
+  ]
+ },
+ "Line Dancing": {
+  "11": [
+   "Stomp, clap, spin and have fun! Kids learn easy-to-follow line dances inspired by today's biggest dance trends, led by a professional host. With interactive games and beginner-friendly routines, it's a high-energy session that builds confidence, teamwork and coordination.",
+   "Line dancing is trending with kids right now! In this hosted incursion, children learn popular line dances step by step, play dance games and perform together as a group. It's beginner friendly, inclusive and full of energy, so every child can join in and shine."
+  ],
+  "12": [
+   "Stomp, clap, spin and have fun with Disco Kids Au Line Dancing, one of the most trending activities with kids right now. A professional host teaches easy-to-follow line dances inspired by today's biggest dance trends, breaking each routine into simple steps so everyone can keep up. Between dances, kids play interactive games and activities that keep the energy high and the laughs coming. Line dancing is naturally inclusive because everyone dances together, side by side, and no partner is needed. Children build confidence, coordination and teamwork while getting active.",
+   "Line dancing has taken off with kids, and our Line Dancing incursion lets them be part of the trend. A Disco Kids Au host teaches popular line dances step by step, then brings the group together to dance in sync. Interactive games and activities keep everyone engaged, and the beginner-friendly routines mean every child can succeed, whatever their experience. Dancing as a group builds a real sense of teamwork and belonging, while learning the steps improves memory, rhythm and coordination. It's high-energy, joyful and easy to run, because we bring everything needed."
+  ],
+  "13": [
+   "Learn popular line dances step by step, play interactive dance games, and dance together as a whole group.",
+   "Stomp, clap and spin through trending routines, practise in small groups, then perform the dances together."
+  ],
+  "14": [
+   "Professional host · Popular line dances · Interactive games and activities · Beginner friendly · Whole-group dancing",
+   "Trending routines kids recognise · Step-by-step teaching · Dance games · No partner needed · Suits all abilities"
+  ],
+  "15": [
+   "Builds confidence, coordination, rhythm and teamwork, and gets the whole group moving and laughing together.",
+   "Improves memory and coordination, creates a sense of belonging, and keeps kids active in an inclusive way."
+  ],
+  "16": [
+   "It taps into a dance trend kids already love, and everyone dances together, so no one is left out.",
+   "Simple, catchy routines mean every child can master a full dance by the end of the session."
+  ]
+ },
+ "Disco": {
+  "11": [
+   "Turn your space into a kids' disco! A professional host leads dance games, party favourites and easy group moves with music the kids love. It's a high-energy, inclusive session where every child can dance, play and celebrate together.",
+   "Get the party started with a Disco Kids Au Disco! Kids dance to their favourite songs, play classic disco games and learn fun group moves, all led by our energetic host. It's joyful, active and perfect for getting everyone moving and smiling."
+  ],
+  "12": [
+   "Turn any space into a kids' disco with Disco Kids Au. Our professional host brings the music and the energy, leading children through party dance games, easy group moves and crowd favourites. Kids dance with friends, play classic games like freeze dance and take part in fun challenges that keep everyone involved. The session is designed so every child can join in, whether they love the dance floor or prefer to start slowly. It's a joyful way to get kids active, build confidence and create a real party atmosphere.",
+   "Every kid loves a disco, and ours is all about joyful movement. A Disco Kids Au host runs the whole session, mixing popular songs with dance games, simple routines and group challenges. Children move, laugh and celebrate together while building coordination and confidence. The host reads the room and keeps the energy just right, so every child feels included. It's a simple, high-energy experience that works for a wide range of ages and group sizes, and it's easy because we provide all the music and equipment."
+  ],
+  "13": [
+   "Dance to music they love, play disco games like freeze dance, and learn easy group dance moves with the host.",
+   "Join party dance games, follow simple routines, and take part in group dance challenges."
+  ],
+  "14": [
+   "Professional host · Kid-friendly music · Disco games · Easy group dance moves · Party atmosphere",
+   "Music and equipment provided · Classic party games · Simple routines · Inclusive for all ages"
+  ],
+  "15": [
+   "Gets kids active, builds confidence and coordination, and brings the group together through shared fun.",
+   "Encourages self-expression and social connection while keeping every child moving and engaged."
+  ],
+  "16": [
+   "A full party experience run by a professional host, with games and moves that keep every child involved.",
+   "Easy to book and suits almost any group, making it a reliable crowd-pleaser."
+  ]
+ },
+ "Silent Circus": {
+  "11": [
+   "Step into the magical world of circus with a silent twist! Using silent disco headphones, kids become fully immersed as they learn circus skills together with a fun, engaging host. Guided circus games build confidence, focus and resilience along the way.",
+   "Circus skills meet silent disco! Each child wears their own headset as our host guides them through circus games and activities. It's immersive, engaging and full of fun, helping kids build focus, confidence and resilience."
+  ],
+  "12": [
+   "Step into the magical world of circus with a silent twist. In Disco Kids Au Silent Circus, every child wears silent disco headphones, so they're fully immersed in the music and the host's instructions. Our fun and engaging host guides the group through circus games and activities, teaching skills step by step with plenty of encouragement. Kids practise together, try new challenges and celebrate each other's progress. The headphones keep focus high and noise low, which helps every child stay engaged. Along the way, children build confidence, concentration and resilience. All circus equipment and headsets are provided.",
+   "Silent Circus combines circus skills with the immersive magic of silent disco headphones. Each child hears the music and the host clearly through their own headset, creating a calm, focused space for learning new skills. A Disco Kids Au host leads guided circus games and activities, encouraging children to try, practise and keep going. It's playful and challenging in the best way, helping kids develop coordination, focus and resilience while having fun with friends."
+  ],
+  "13": [
+   "Wear silent disco headsets and learn circus skills through guided games and activities with the host.",
+   "Try circus equipment, practise new tricks, and take part in circus games while listening through their own headset."
+  ],
+  "14": [
+   "Circus equipment · Headsets for all · Fun and engaging host · Guided circus games and activities",
+   "Silent disco headphones · Step-by-step circus skills · Immersive music · All equipment provided"
+  ],
+  "15": [
+   "Builds confidence, focus and resilience as kids learn new skills and keep trying.",
+   "Develops coordination and concentration, and encourages kids to support each other's progress."
+  ],
+  "16": [
+   "The silent disco headsets make circus learning immersive and focused, which is a unique twist on a circus workshop.",
+   "Combines two kid favourites, circus and silent disco, into one engaging session."
+  ]
+ },
+ "Silent Mindful Art / Movement": {
+  "11": [
+   "Focus, create and move! A unique blend of mindful art, movement, creativity and relaxation. Using silent disco headphones, kids explore guided activities designed to encourage focus, self-expression and wellbeing.",
+   "Silent Mindful Art & Movement gives kids a calm, creative space. Through their own silent disco headphones, they follow guided art and movement activities that support focus, self-expression and wellbeing."
+  ],
+  "12": [
+   "Focus, create and move with Disco Kids Au Silent Mindful Art & Movement. This unique session blends mindful art, gentle movement, creativity and relaxation into one immersive experience. Every child wears silent disco headphones, so they can tune in to calming music and the host's guidance without distractions. Kids explore guided mindful art activities, express themselves creatively, and move through relaxing, joyful movement sequences. It's a wonderful way to support wellbeing, focus and self-expression. The session suits a wide range of ages and abilities, and all headphones and materials are provided.",
+   "Silent Mindful Art & Movement is a calming, creative incursion designed to support kids' wellbeing. Using silent disco headphones, children are guided through mindful art activities and gentle movement, creating a peaceful, focused atmosphere. The host encourages creativity and self-expression, with no right or wrong answers, so every child feels comfortable taking part. Kids leave feeling relaxed, proud of their creations and more connected to their own feelings. It's a lovely balance to high-energy activities, and we provide all headphones and art materials."
+  ],
+  "13": [
+   "Wear silent disco headphones and follow guided mindful art activities, then move through calming, joyful movement.",
+   "Create art while listening to calming music, try gentle movement and relaxation activities, and express themselves creatively."
+  ],
+  "14": [
+   "Silent disco headphones for all · Guided mindful art activities · Movement activities · Creativity and self-expression",
+   "Calming music · Art materials provided · Gentle guided movement · Suits all ages and abilities"
+  ],
+  "15": [
+   "Supports wellbeing, focus and self-expression, and helps kids feel calm and regulated.",
+   "Encourages creativity and mindfulness, and gives kids tools to relax and refocus."
+  ],
+  "16": [
+   "Combines mindful art and movement with silent disco headphones, creating a calm, focused space in any centre.",
+   "A rare wellbeing-focused incursion that balances out high-energy holiday programs."
+  ]
+ },
+ "Playground Crazes": {
+  "11": [
+   "Blast from the past! Before screens, there were playground crazes. Kids explore the movement trends and schoolyard favourites we grew up with through music, challenges, teamwork and plenty of fun.",
+   "Playground Crazes brings back the schoolyard games of decades gone by. With all equipment provided, kids take on team challenges and activities set to music, discovering classic crazes and having a blast together."
+  ],
+  "12": [
+   "Blast from the past with Disco Kids Au Playground Crazes. Before screens, there were playground crazes, and this incursion brings them back to life. Kids explore the movement trends and schoolyard favourites of decades gone by through music, challenges, teamwork and plenty of fun. A Disco Kids Au host introduces each craze, shows the kids how it's done, then sets up team challenges and activities so everyone can have a go. It's active, social and screen-free, and it often sparks new games that kids keep playing long after the session. All equipment is provided.",
+   "Playground Crazes is a screen-free trip back in time. Kids discover the schoolyard games and movement trends that parents and grandparents loved, from classic crazes to team challenges, all set to music. A Disco Kids Au host leads the session, teaching each activity and keeping the energy high with friendly challenges. Children work together, take turns and cheer each other on, building teamwork and coordination along the way. It's nostalgic for staff and brand new for kids, which makes it a hit with everyone. We bring all the equipment needed."
+  ],
+  "13": [
+   "Try playground crazes from decades gone by, take part in team challenges, and play games set to music.",
+   "Learn classic schoolyard games, compete in friendly team challenges and move to music with the host."
+  ],
+  "14": [
+   "Playground crazes from decades gone by · Team challenges and activities · Music, movement and fun · All equipment provided",
+   "Classic schoolyard games · Hosted team challenges · Screen-free fun · Suits mixed ages"
+  ],
+  "15": [
+   "Builds teamwork, coordination and social skills, and gets kids active without screens.",
+   "Encourages cooperation and turn-taking, and gives kids new games to keep playing."
+  ],
+  "16": [
+   "It introduces kids to retro playground games they've never seen, making it nostalgic for staff and fresh for kids.",
+   "A screen-free incursion that sparks games kids keep playing long after the session ends."
+  ]
+ },
+ "Dance Through The Decades": {
+  "11": [
+   "A musical time machine! Using silent disco headphones, kids explore iconic dance crazes and musical hits from different decades through movement, games and laughter.",
+   "Dance Through The Decades takes kids on a musical journey. Through their own silent disco headsets, they learn dance moves from multiple decades and join partner, group and movement games."
+  ],
+  "12": [
+   "Jump into a musical time machine with Disco Kids Au Dance Through The Decades. Using silent disco headphones, kids explore iconic dance crazes and musical hits from different decades through movement, games and laughter. A professional host guides the group from one era to the next, teaching signature moves and running partner and group activities along the way. The headphones make it fully immersive, so every child is tuned in to the music and the fun. It's high-energy, inclusive and a great way to build rhythm, coordination and confidence. All headphones and equipment are provided.",
+   "Dance Through The Decades is a high-energy journey through music history, made for kids. Each child wears silent disco headphones and follows our host through famous dance moves and hit songs from different decades. Interactive movement games, partner activities and group dances keep everyone involved and laughing. Kids discover music their parents and grandparents loved while building coordination, rhythm and teamwork. We bring everything needed."
+  ],
+  "13": [
+   "Wear silent disco headphones and learn dance moves from multiple decades, with partner, group and movement games.",
+   "Travel through musical eras, learn iconic dance crazes and join interactive dance games with the group."
+  ],
+  "14": [
+   "Silent disco headphones for all · Dance moves from multiple decades · Partner and group activities · Interactive movement games",
+   "Iconic songs and dance crazes · Professional host · Immersive headsets · Beginner friendly"
+  ],
+  "15": [
+   "Builds rhythm, coordination and confidence, and connects kids with music across generations.",
+   "Encourages teamwork through partner and group dances, and keeps every child active and laughing."
+  ],
+  "16": [
+   "A musical time machine: kids experience decades of dance crazes in one immersive silent disco session.",
+   "Combines music history with silent disco, giving kids a fun way to discover songs from other eras."
+  ]
+ }
+};
+const H=["Product Name","XERO Code","Brand","Product Category","Target Demographic/s","Recommended Age/s","Duration","Maximum Participants/Capacity","Locations Available","Indoor/Outdoor/Both","One-Line Description","Short Blurb","Full Marketing Blurb","What Participants Actually Do","Key Experience Features","Benefits/Outcomes","What Makes The Experience Different","Primary Target Audience","Secondary Target Audience","Potential Client Types","Suitable Venues/Settings","Standard Price","Agent Price (if applicable)","Materials/Per-Person Fees","Additional Participant Pricing","Staffing Requirements","Travel/Location Considerations","Add-Ons Available","Space Requirements","Equipment Required","Client Requirements","Accessibility Considerations","Wet Weather Considerations (if applicable)","Important Delivery Notes","Canva Flyer Link","Photo Folder","Video/Reel Links","Website Page","Agent Listing","Existing Marketing Copy","Other Relevant Collateral","Current Status (Active/Seasonal/In Development/Paused/Retired)","Information Still Required","Amanda Approval Required?","Last Reviewed Date"];
+const AUD=["OOSH / Vacation Care","Primary Schools","Early Learning Centres","Councils & Libraries","Community Groups","Disability Programs / NDIS","Families"];
+// How each field is asked. t: confirm | single | multi | suggest | text | price
+const F={
+ 0:{t:"confirm"},1:{t:"confirm"},
+ 2:{t:"single",o:["Disco Kids","Disco Peeps","Both"]},
+ 3:{t:"single",o:["Incursion","Workshop","Excursion","Activation","Program"],other:1},
+ 4:{t:"multi",o:["Kids","Youth","Families","Schools & Education","OOSH / Vacation Care","Disability & Inclusion","Community Groups"],other:1},
+ 5:{t:"multi",o:["Toddlers (2-5)","Primary Age (5-12)","Youth (12-18)","Adult (18+)","Seniors (55+)","Disability","Family Groups","All"]},
+ 6:{t:"multi",o:["1.5hrs","2hrs","3hrs"],other:1},
+ 7:{t:"single",o:["Up to 40","Up to 60"],other:1},
+ 8:{t:"single",o:["NSW","QLD","Both"]},
+ 9:{t:"single",o:["Indoor","Outdoor","Both"]},
+ 10:{t:"confirm",long:1},
+ 11:{t:"suggest"},12:{t:"suggest"},13:{t:"suggest"},14:{t:"suggest"},15:{t:"suggest"},16:{t:"suggest"},
+ 17:{t:"single",o:AUD,other:1},18:{t:"multi",o:AUD.concat(["None"]),other:1},
+ 19:{t:"multi",o:["OOSH services","Vacation care programs","Primary schools","Early learning centres","Councils","Libraries","Community centres","NDIS providers","Event organisers"],other:1},
+ 20:{t:"multi",o:["School hall","Classroom","OOSH centre","Community hall","Library","Outdoor oval / playground","Covered outdoor area"],other:1},
+ 21:{t:"price"},
+ 23:{t:"single",o:["None (all included)"],other:1,lbl:"Or type the fee"},
+ 24:{t:"confirm"},
+ 25:{t:"text",same:1},26:{t:"text",same:1},27:{t:"text",same:1,quick:["None"]},28:{t:"text",same:1},29:{t:"text",same:1},30:{t:"text",same:1,quick:["Just a space, we bring everything"]},31:{t:"text",same:1},32:{t:"text",same:1,quick:["Not applicable (indoor)"]},33:{t:"text",same:1,quick:["None"]},
+ 41:{t:"single",o:["Active","Seasonal","In Development","Paused","Retired"]},
+ 42:{t:"text",quick:["Nothing else needed"]},
+ 43:{t:"single",o:["Yes","No"]}
+};
+const LABEL={21:"Pricing (Agents & PVT)"};
+const PAGES=[["Product Basics",[0,1,2,3,4,5,6,7,8,9]],["Marketing",[10,11,12,13,14,15,16]],["Target Market",[17,18,19,20]],["Pricing",[21,23,24]],["Delivery",[25,26,27,28,29,30,31,32,33]],["Admin",[41,42,43]]];
+const COLORS=["--t1","--t2","--t3","--t4","--t5","--t6","--t7","--t8","--t9"];
+let state={},cur=null,editing=null;
+const today=()=>new Date().toLocaleDateString("en-CA");
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const isTbc=v=>!v||v==="TBC"||v==="-"||v==="COPY TO REVIEW"||v==="AMANDA TO REVIEW";
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2600)}
+const prog=i=>state["p"+i]||{};
+const ans=(i,c)=>prog(i).f?.["c"+c];
+function xs(i){const s=prog(i);return s.xs||(s.xero?[s.xero]:[])}
+function wb(i,c){const L=xs(i);if(c===24)return"$8 per additional child";if(c===0&&L.length!==1)return DATA.progs[i].name;if(c===1&&L.length>1)return L.map(id=>DATA.xero[id][1]).join(", ");const x=L.length?DATA.xero[L[0]]:null;return x?x[c]:""}
+const filled=(i,c)=>{const a=ans(i,c);if(!a)return false;if(c===21)return !!(a.t&&"abcdef".split("").every(k=>a.t[k]));return !!String(a.v||"").trim()};
+const pageDone=(i,k)=>PAGES[k][1].every(c=>filled(i,c));
+function status(i){const s=prog(i);if(s.done)return"Done ✓";if(s.xero!==undefined)return"In progress";return"To do"}
+
+async function load(){try{const r=await fetch(SCRIPT_URL+"?t="+Date.now());state=await r.json()||{};}catch(e){toast("Couldn't load saved answers. Check your internet and refresh.")}}
+async function boot(){
+  render();
+  if(SCRIPT_URL.startsWith("PASTE")){document.getElementById("app").insertAdjacentHTML("afterbegin",`<div class="fv small" style="margin-bottom:12px">Setup needed: add your Google Apps Script URL at the top of index.html.</div>`);return}
+  await load();render();
+  setInterval(async()=>{if(!cur){await load();render()}},30000);
+}
+function rowFor(i){return H.map((h,c)=>{const x=ans(i,c);if(x)return x.v;if(c===22)return ans(i,21)?.agent||"TBC";if(c>=34&&c<=40)return"TBC (Erika)";const w=wb(i,c);return isTbc(w)?"TBC":w})}
+async function save(i,patch){const id="p"+i;state[id]={...(state[id]||{}),...patch,at:new Date().toISOString()};
+  const p=state[id];const com=Object.entries(p.com||{}).filter(([,v])=>v).map(([k,v])=>`${k==="x"?"Step 1":PAGES[k]?.[0]||k}: ${v}`).join("\n");
+  const body={id,name:DATA.progs[i].name,data:p,headers:H,row:rowFor(i),status:p.done?"Done":p.xero!==undefined||p.xs?"In progress":"To do",comments:com};
+  try{await fetch(SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify(body)})}catch(e){toast("Didn't save. Check your internet and try again.")}}
+async function setAns(c,obj){const f={...(prog(cur.i).f||{})};f["c"+c]={was:f["c"+c]?.was??wb(cur.i,c),...obj,by:"Amanda",at:today()};await save(cur.i,{f})}
+
+function render(){const app=document.getElementById("app");
+  if(!cur){app.innerHTML=home();return}
+  app.innerHTML=cur.step==="xero"?xeroPage():cur.step==="done"?donePage():page();
+}
+function home(){
+  const n=DATA.progs.length,done=DATA.progs.filter((p,i)=>prog(i).done).length,next=DATA.progs.findIndex((p,i)=>!prog(i).done);
+  return `<div class="hero"><h1>Let's Fix <span style="color:var(--agent)">Agents</span> and <span style="color:var(--pvt)">PVTs</span></h1><div style="font:700 1.25rem var(--display)">School Holidays Services</div>
+   <p class="muted" style="margin:0;max-width:48ch">${done===n?"All 9 programs are done. Thank you!":"Go through each program and pick, tick or fill in the details. Your answers save as you go."}</p>
+   <div class="bar"><i style="width:${Math.round(done/n*100)}%"></i></div><div class="small muted">${done} of ${n} programs done</div>
+   ${next>=0?`<button class="btn primary big" data-a="open" data-i="${next}">${done||prog(next).xero!==undefined?"Continue ▶":"Let's start ▶"}</button>`:`<button class="btn primary big" data-a="excel">Download Excel</button>`}</div>
+   <div class="tiles">${DATA.progs.map((p,i)=>`<button class="tile" style="background:var(${COLORS[i]})" data-a="open" data-i="${i}"><span class="st">${status(i)}</span><span>${esc(p.name)}</span></button>`).join("")}</div>
+   ${done&&next>=0?`<div class="row" style="justify-content:center;margin-top:18px"><button class="btn small" data-a="excel">Download Excel of answers so far</button></div>`:""}`;
+}
+function header(){const p=DATA.progs[cur.i];const at=cur.step==="xero"?0:cur.step==="done"?PAGES.length+1:cur.step+1;
+  return `<div class="top"><button class="btn small" data-a="home">← All programs</button><span class="chip">${cur.i+1} of 9 · ${esc(p.name)}</span></div>
+  <div class="steps">${Array.from({length:PAGES.length+1},(_,k)=>`<span class="${k<=at?"on":""}"></span>`).join("")}</div>`}
+let multi=false,pickSet=[];
+function xeroPage(){const p=DATA.progs[cur.i],s=prog(cur.i);const L=multi?pickSet:xs(cur.i);
+  return `${header()}<div class="card"><div class="eyebrow">Step 1</div><h2>Which Xero product${multi?"s are":" is"} ${esc(p.name)}?</h2>
+   <p class="muted small">We'll use the details to start you off.</p>
+   <label class="row small" style="margin:10px 0;cursor:pointer;font-weight:600"><input type="checkbox" id="multi" style="width:auto" ${multi?"checked":""}> This program uses more than one Xero product</label>
+   <div class="pick">${p.cands.map(id=>{const x=DATA.xero[id];const on=L.includes(id);return `<button class="btn ${on?"sel":""}" data-a="xero" data-v="${id}"><span>${multi?(on?"☑ ":"☐ "):""}<b>${esc(x[0])}</b><br><span class="small muted">${esc(x[1])}</span></span></button>`}).join("")}
+   ${multi?"":`<button class="btn ${s.xero===null&&!s.xs?.length?"sel":""}" data-a="xero" data-v=""><span><b>None of these</b><br><span class="small muted">Start with empty details</span></span></button>`}</div>
+   ${multi?`<div class="foot"><span class="small muted" style="align-self:center">${pickSet.length} selected</span><button class="btn primary" data-a="xmulti" ${pickSet.length?"":"disabled"}>Next →</button></div>`:""}
+   ${comment("x")}</div>`}
+function page(){const [title,cols]=PAGES[cur.step];const left=cols.filter(c=>!filled(cur.i,c)).length;
+  const note=title==="Delivery"&&cur.i>0?`<div class="fv small" style="margin-bottom:6px">If a delivery detail is the same as the previous program, just tap <b>Same as ${esc(DATA.progs[prevIdx()]?.name||"previous")}</b>.${prevIdx()>=0?` <button class="btn small" data-a="sameall">Use all from ${esc(DATA.progs[prevIdx()].name)}</button>`:""}</div>`:"";
+  return `${header()}<div class="card"><div class="eyebrow">Step ${cur.step+2} of ${PAGES.length+1}</div><h2>${title}</h2>
+   ${note}${cols.map(field).join("")}${comment(cur.step)}
+   <div class="foot"><button class="btn" data-a="back">← Back</button><span class="small muted" style="align-self:center">${left?`${left} left on this page`:"All done ✓"}</span><button class="btn primary" data-a="next" ${left?"disabled":""}>${cur.step===PAGES.length-1?"Finish this program ✓":"Next →"}</button></div></div>`}
+function comment(k){const v=prog(cur.i).com?.[k]||"";return `<div class="f" style="margin-top:14px;border-top:1px dashed var(--line)"><div class="fl">💬 Comments <span class="small muted" style="font-weight:500">(optional)</span></div>
+  <textarea id="com" placeholder="Please put a comment if I forgot to add something">${esc(v)}</textarea><div><button class="btn small" data-a="savecom" data-k="${k}">${v?"Update comment":"Save comment"}</button></div></div>`}
+function prevIdx(){for(let k=cur.i-1;k>=0;k--){if(prog(k).f)return k}return -1}
+function field(c){
+  const spec=F[c],a=ans(cur.i,c),done=filled(cur.i,c),w=wb(cur.i,c);
+  const head=`<div class="row" style="justify-content:space-between"><span class="fl">${esc(LABEL[c]||H[c])}</span>${done?`<span class="tag ok">Done</span>`:`<span class="tag chg">Needed</span>`}</div>`;
+  let body="";
+  if(spec.t==="confirm"){
+    if(editing===c)body=`${spec.long?`<textarea id="ed">${esc(a?.v??(isTbc(w)?"":w))}</textarea>`:`<input id="ed" value="${esc(a?.v??(isTbc(w)?"":w))}">`}<div class="row"><button class="btn primary small" data-a="saveed" data-c="${c}">Save</button><button class="btn small" data-a="canced">Cancel</button></div>`;
+    else{const v=a?.v??w;body=`<div class="fv ${isTbc(v)?"tbc":""}">${isTbc(v)?"Not filled in yet":esc(v)}</div><div class="row">${isTbc(v)?"":`<button class="btn ok small ${a?"on":""}" data-a="ok" data-c="${c}">✓ Correct</button>`}<button class="btn small" data-a="edit" data-c="${c}">${isTbc(v)?"Fill in":"Change"}</button></div>`}
+  }
+  if(spec.t==="single"||spec.t==="multi"){
+    const have=a?.v?String(a.v).split(/\s*,\s*/):[];const extra=have.filter(x=>!spec.o.includes(x)).join(", ");
+    body=`<div class="choices">${spec.o.map(o=>`<button class="btn ${have.includes(o)?"sel":""}" data-a="${spec.t}" data-c="${c}" data-v="${esc(o)}">${spec.t==="multi"?(have.includes(o)?"☑ ":"☐ "):""}${esc(o)}</button>`).join("")}</div>
+     ${spec.other?`<div class="row" style="flex-wrap:nowrap"><input id="oth-${c}" placeholder="${spec.lbl||"Something else? Type it here"}" value="${esc(extra)}"><button class="btn small" data-a="oth" data-c="${c}">Add</button></div>`:""}
+     ${spec.t==="multi"?`<div class="small muted">Pick as many as apply.</div>`:""}${!done&&w&&!isTbc(w)&&!spec.o.includes(w)?`<div class="small muted">Xero says: ${esc(w)}</div>`:""}`;
+  }
+  if(spec.t==="suggest"){
+    const s=SUG[DATA.progs[cur.i].name]?.[c]||[];const v=a?.v||"";const own=v&&!s.includes(v);
+    body=`<div class="pick">${s.map((x,k)=>`<button class="btn ${v===x?"sel":""}" data-a="sug" data-c="${c}" data-k="${k}"><span><b class="small" style="color:var(--accent)">Option ${k+1}${v===x?" ✓":""}</b><br>${esc(x)}</span></button>`).join("")}
+     ${editing===c?`<textarea id="ed">${esc(own?v:"")}</textarea><div class="row"><button class="btn primary small" data-a="saveown" data-c="${c}">Save my version</button><button class="btn small" data-a="canced">Cancel</button></div>`
+      :own?`<div class="btn sel" style="cursor:default;text-align:left"><b class="small" style="color:var(--accent)">Your version ✓</b><br>${esc(v)}</div><div><button class="btn small" data-a="edit" data-c="${c}">Edit my version</button></div>`
+      :`<button class="btn" data-a="edit" data-c="${c}"><span><b>✨ Ooh, I've got my own idea!</b><br><span class="small muted">Write it your way</span></span></button>`}</div>`;
+  }
+  if(spec.t==="text"){
+    const p=prevIdx();const pv=spec.same&&p>=0?ans(p,c)?.v:"";
+    if(editing===c||!a)body=`<textarea id="ed-${c}" placeholder="Type here">${esc(a?.v??(isTbc(w)?"":w))}</textarea><div class="row"><button class="btn primary small" data-a="savetxt" data-c="${c}">Save</button>${(spec.quick||[]).map(q=>`<button class="btn small" data-a="quick" data-c="${c}" data-v="${esc(q)}">${esc(q)}</button>`).join("")}${pv?`<button class="btn small" data-a="same" data-c="${c}">Same as ${esc(DATA.progs[p].name)}</button>`:""}${a?`<button class="btn small" data-a="canced">Cancel</button>`:""}</div>${pv?`<div class="small muted">${esc(DATA.progs[p].name)}: ${esc(pv)}</div>`:""}`;
+    else body=`<div class="fv">${esc(a.v)}</div><div><button class="btn small" data-a="edit" data-c="${c}">Change</button></div>`;
+  }
+  if(spec.t==="price"){const t=a?.t||{};
+    const tier2=(k,lbl,def)=>{const v=t[k];const ed=editing==="p"+k||(!v&&!def);
+      return `<div class="prow"><b>${lbl}</b>${ed?`<span class="row" style="flex-wrap:nowrap;gap:6px"><span>$</span><input id="pr-${k}" inputmode="decimal" placeholder="0" style="width:90px;padding:6px 8px" value="${esc((v||"").replace(/^\$/,"").replace("Not offered",""))}"><button class="btn primary small" data-a="prsave" data-k="${k}">Save</button><button class="btn small" data-a="prnone" data-k="${k}">Not offered</button></span>`
+       :v?`<span class="row" style="gap:6px"><span class="tag ok">${esc(v)}</span><button class="btn small" data-a="predit" data-k="${k}">Change</button></span>`
+       :`<span class="row" style="gap:6px"><b>${def}</b><button class="btn ok small" data-a="prok" data-k="${k}" data-v="${def}">✓</button><button class="btn small" data-a="predit" data-k="${k}">Change</button></span>`}</div>`};
+    body=`<div class="pgrid"><div><div class="eyebrow" style="color:var(--agent)">Agents</div>${tier2("a","1.5 hrs","$475")}${tier2("b","2 hrs","")}${tier2("c","3 hrs","")}</div>
+      <div><div class="eyebrow" style="color:var(--pvt)">PVT</div>${tier2("d","1.5 hrs","$525")}${tier2("e","2 hrs","")}${tier2("f","3 hrs","")}</div></div>`;
+  }
+  if(false){
+    const tier=(k,lbl,def)=>`<div class="f" style="padding:8px 0"><div class="row" style="justify-content:space-between"><b>${lbl}</b>${t[k]?`<span class="tag ok">${esc(t[k])}</span>`:""}</div>
+      ${editing==="p"+k||(!t[k]&&!def)?`<div class="row" style="flex-wrap:nowrap"><span style="font:800 1.2rem var(--display)">$</span><input id="pr-${k}" inputmode="decimal" placeholder="Agent price" value="${esc((t[k]||"").replace(/^\$/,"").replace("Not offered",""))}"><button class="btn primary small" data-a="prsave" data-k="${k}">Save</button></div><div class="row"><button class="btn small" data-a="prnone" data-k="${k}">Not offered</button></div>`
+      :t[k]?`<div><button class="btn small" data-a="predit" data-k="${k}">Change</button></div>`
+      :`<div class="fv">${def}</div><div class="row"><button class="btn ok small" data-a="prok" data-k="${k}" data-v="${def}">✓ Correct</button><button class="btn small" data-a="predit" data-k="${k}">Change</button></div>`}</div>`;
+    body=`<div class="small muted">Agents only. This is different from PVT pricing.</div>${tier("a","1.5 hours","$475")}${tier("b","2 hours","")}${tier("c","3 hours","")}`;
+  }
+  return `<div class="f">${head}${body}</div>`;
+}
+function donePage(){const p=DATA.progs[cur.i];const next=DATA.progs.findIndex((q,i)=>!prog(i).done);setTimeout(confetti,60);
+  return `${header()}<div class="card" style="text-align:center;display:grid;gap:10px;justify-items:center"><div class="eyebrow">Program done</div><h2>${esc(p.name)} ✓</h2>
+   <p class="muted" style="margin:0">All details filled in. Thank you!</p>
+   <div class="row" style="justify-content:center"><button class="btn" data-a="back">← Back</button>${next>=0?`<button class="btn primary big" data-a="open" data-i="${next}">Next: ${esc(DATA.progs[next].name)} ▶</button>`:`<button class="btn primary big" data-a="excel">Download Excel</button>`}<button class="btn" data-a="home">All programs</button></div></div>`}
+
+let busy=false;
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("[data-a]");if(!t||t.disabled||busy)return;const a=t.dataset.a,c=+t.dataset.c;busy=true;
+  try{await act(a,t,c)}finally{busy=false}
+});
+async function act(a,t,c){
+  const keep=window.scrollY;const done=()=>{render();window.scrollTo(0,keep)};const top=()=>{render();window.scrollTo(0,0)};
+  if(a==="home"){cur=null;editing=null;return top()}
+  if(a==="open"){const i=+t.dataset.i;cur={i,step:prog(i).xero===undefined?"xero":0};editing=null;pickSet=xs(i).slice();multi=pickSet.length>1;return top()}
+  if(a==="xero"){const v=t.dataset.v||null;if(multi){pickSet=pickSet.includes(v)?pickSet.filter(x=>x!==v):[...pickSet,v];return done()}
+    const same=xs(cur.i).length===(v?1:0)&&(v?xs(cur.i)[0]===v:prog(cur.i).xero===null);if(!same)await save(cur.i,{xero:v,xs:v?[v]:[],f:{}});cur.step=0;return top()}
+  if(a==="xmulti"){const old=xs(cur.i).join();if(old!==pickSet.join())await save(cur.i,{xero:pickSet[0],xs:pickSet,f:{}});cur.step=0;return top()}
+  if(a==="savecom"){const v=document.getElementById("com").value.trim();await save(cur.i,{com:{...(prog(cur.i).com||{}),[t.dataset.k]:v}});toast(v?"Comment saved":"Comment cleared");return done()}
+  if(a==="ok"){await setAns(c,{v:wb(cur.i,c)});return done()}
+  if(a==="edit"){editing=c;done();setTimeout(()=>document.getElementById("ed")?.focus(),0);return}
+  if(a==="canced"){editing=null;return done()}
+  if(a==="saveed"||a==="saveown"){const v=document.getElementById("ed").value.trim();if(!v)return toast("Type an answer, or press Cancel");editing=null;await setAns(c,{v});return done()}
+  if(a==="single"){await setAns(c,{v:t.dataset.v});return done()}
+  if(a==="multi"){const cur0=ans(cur.i,c)?.v;let have=cur0?cur0.split(/\s*,\s*/):[];const v=t.dataset.v;have=have.includes(v)?have.filter(x=>x!==v):[...have,v];await setAns(c,{v:have.join(", ")});return done()}
+  if(a==="oth"){const v=document.getElementById("oth-"+c).value.trim();if(!v)return toast("Type something first");const spec=F[c];
+    if(spec.t==="single"){await setAns(c,{v})}else{const have=(ans(cur.i,c)?.v||"").split(/\s*,\s*/).filter(x=>x&&spec.o.includes(x));await setAns(c,{v:[...have,v].join(", ")})}return done()}
+  if(a==="sug"){await setAns(c,{v:SUG[DATA.progs[cur.i].name][c][+t.dataset.k]});editing=null;return done()}
+  if(a==="savetxt"){const v=document.getElementById("ed-"+c).value.trim();if(!v)return toast("Type an answer, or tap a quick option");editing=null;await setAns(c,{v});return done()}
+  if(a==="quick"){editing=null;await setAns(c,{v:t.dataset.v});return done()}
+  if(a==="same"){editing=null;await setAns(c,{v:ans(prevIdx(),c).v,same:1});return done()}
+  if(a==="sameall"){const p=prevIdx();const f={...(prog(cur.i).f||{})};PAGES[4][1].forEach(k=>{const pv=ans(p,k);if(pv&&!f["c"+k])f["c"+k]={v:pv.v,same:1,was:wb(cur.i,k),by:"Amanda",at:today()}});editing=null;await save(cur.i,{f});toast("Copied from "+DATA.progs[p].name+". Check anything that's different.");return done()}
+  if(a.startsWith("pr")){const k=t.dataset.k;const tt={...(ans(cur.i,21)?.t||{})};
+    if(a==="predit"){editing="p"+k;return done()}
+    if(a==="prok")tt[k]=t.dataset.v;
+    if(a==="prnone")tt[k]="Not offered";
+    if(a==="prsave"){let v=document.getElementById("pr-"+k).value.trim().replace(/^\$/,"");if(!/^\d+(\.\d{1,2})?$/.test(v))return toast("Enter a number, e.g. 550");tt[k]="$"+v}
+    editing=null;await setAns(21,{t:tt,v:`1.5hrs ${tt.d||"?"} · 2hrs ${tt.e||"?"} · 3hrs ${tt.f||"?"}`,agent:`1.5hrs ${tt.a||"?"} · 2hrs ${tt.b||"?"} · 3hrs ${tt.c||"?"}`});return done()}
+  if(a==="back"){editing=null;pickSet=xs(cur.i).slice();multi=pickSet.length>1;if(cur.step==="done")cur.step=PAGES.length-1;else if(cur.step===0)cur.step="xero";else if(cur.step!=="xero")cur.step--;return top()}
+  if(a==="next"){if(!pageDone(cur.i,cur.step))return toast("Please finish every item on this page first");editing=null;
+    if(cur.step===PAGES.length-1){const f={...(prog(cur.i).f||{})};f.c44={v:today(),by:"auto",at:today()};await save(cur.i,{done:true,f});cur.step="done"}else cur.step++;return top()}
+  if(a==="excel")excel();
+}
+function excel(){
+  if(typeof XLSX==="undefined"){toast("Download isn't available. Refresh and try again.");return}
+  const rows=[H.slice()];
+  DATA.progs.forEach((p,i)=>rows.push(rowFor(i)));
+  const log=[["Program","Field","Workbook value","Amanda's answer","Date"]];
+  DATA.progs.forEach((p,i)=>Object.entries(prog(i).f||{}).forEach(([k,x])=>{if(k!=="c44")log.push([p.name,H[+k.slice(1)],x.was||"",x.v,x.at])}));
+  const cm=[["Program","Page","Comment"]];const PN={x:"Step 1 · Xero product"};PAGES.forEach((p,k)=>PN[k]=p[0]);
+  DATA.progs.forEach((p,i)=>Object.entries(prog(i).com||{}).forEach(([k,v])=>{if(v)cm.push([p.name,PN[k]||k,v])}));
+  const b=XLSX.utils.book_new();XLSX.utils.book_append_sheet(b,XLSX.utils.aoa_to_sheet(cm),"Comments");XLSX.utils.book_append_sheet(b,XLSX.utils.aoa_to_sheet(rows),"School Holidays (Agents)");XLSX.utils.book_append_sheet(b,XLSX.utils.aoa_to_sheet(log),"Amanda's Answers");
+  XLSX.writeFile(b,`Agents and PVTs School Holidays ${today()}.xlsx`);toast("Downloaded");
+}
+function confetti(){if(matchMedia("(prefers-reduced-motion: reduce)").matches||document.getElementById("confetti"))return;const c=document.createElement("canvas");c.id="confetti";document.body.appendChild(c);const x=c.getContext("2d");c.width=innerWidth;c.height=innerHeight;
+  const cs=getComputedStyle(document.documentElement);const cols=COLORS.map(v=>cs.getPropertyValue(v).trim());
+  const ps=Array.from({length:120},()=>({x:c.width/2,y:c.height/3,vx:(Math.random()-.5)*13,vy:-Math.random()*11-3,r:Math.random()*6+3,c:cols[Math.floor(Math.random()*9)],a:Math.random()*6}));
+  let t=0;(function f(){x.clearRect(0,0,c.width,c.height);ps.forEach(p=>{p.vy+=.33;p.x+=p.vx;p.y+=p.vy;p.a+=.2;x.save();x.translate(p.x,p.y);x.rotate(p.a);x.fillStyle=p.c;x.fillRect(-p.r/2,-p.r/4,p.r,p.r/2);x.restore()});if(++t<140)requestAnimationFrame(f);else c.remove()})()}
+boot();
+
+</script>
+</body></html>
